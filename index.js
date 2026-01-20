@@ -21,16 +21,18 @@ app.post('/validate-code', async (req, res) => {
     console.log(`[${code}] Visiting product: ${product_url}`);
     await page.goto(product_url, { waitUntil: 'networkidle2' });
     
+    // STEP 2: GET ORIGINAL PRICE (Noon)
     const originalPrice = await page.evaluate(() => {
-      const selector = 'FILL_IN_PRICE_SELECTOR_HERE';
+      const selector = '[data-qa="div-price-now"]';
       const element = document.querySelector(selector);
       return element ? element.textContent.trim() : 'N/A';
     });
     
     console.log(`[${code}] Original price: ${originalPrice}`);
     
+    // STEP 3: ADD TO CART (Noon)
     try {
-      const addToCartSelector = 'FILL_IN_ADD_TO_CART_SELECTOR_HERE';
+      const addToCartSelector = '.QuickAtc-module-scss-module__x7ROma__atcCta';
       await page.click(addToCartSelector);
       console.log(`[${code}] Added to cart`);
       await page.waitForTimeout(2000);
@@ -38,7 +40,8 @@ app.post('/validate-code', async (req, res) => {
       console.log(`[${code}] Add to cart failed: ${err.message}`);
     }
     
-    const cartPath = 'FILL_IN_CART_PATH_HERE';
+    // STEP 4: GO TO CART (Noon)
+    const cartPath = '/saudi-en/cart/';   // from href on cart link [web:3]
     const cartUrl = new URL(store_url).origin + cartPath;
     
     console.log(`[${code}] Navigating to cart: ${cartUrl}`);
@@ -48,7 +51,8 @@ app.post('/validate-code', async (req, res) => {
       console.log(`[${code}] Cart navigation warning: ${err.message}`);
     }
     
-    const codeInputSelector = 'FILL_IN_PROMO_INPUT_SELECTOR_HERE';
+    // STEP 5: PROMO INPUT (Noon)
+    const codeInputSelector = '[data-qa="cart-input_coupon_code"]';
     const codeInput = await page.$(codeInputSelector).catch(() => null);
     
     if (!codeInput) {
@@ -66,7 +70,8 @@ app.post('/validate-code', async (req, res) => {
     await codeInput.type(code);
     await page.waitForTimeout(1000);
     
-    const applyButtonSelector = 'FILL_IN_APPLY_BUTTON_SELECTOR_HERE';
+    // STEP 6: APPLY BUTTON (Noon)
+    const applyButtonSelector = '[data-qa="cart-apply_coupon_code"]';
     const applyBtn = await page.$(applyButtonSelector).catch(() => null);
     
     if (applyBtn) {
@@ -79,11 +84,13 @@ app.post('/validate-code', async (req, res) => {
       await page.waitForTimeout(3000);
     }
     
+    // STEP 7: FINAL TOTAL (Noon)
     const finalPrice = await page.evaluate(() => {
-      const totalSelector = 'FILL_IN_TOTAL_PRICE_SELECTOR_HERE';
+      const totalSelector = '.CartInvoiceSummary-module-scss-module__97FMcq__column.CartInvoiceSummary-module-scss-module__97FMcq__largerText';
       const errorSelector = '.error, .alert-danger, [class*="error"]';
       
-      const total = document.querySelector(totalSelector)?.textContent.trim() || 'N/A';
+      const totalEl = document.querySelector(totalSelector);
+      const total = totalEl ? totalEl.textContent.trim() : 'N/A';
       const errorMsg = document.querySelector(errorSelector)?.textContent.trim() || '';
       
       return { total, errorMsg };
@@ -92,6 +99,7 @@ app.post('/validate-code', async (req, res) => {
     console.log(`[${code}] Final price: ${finalPrice.total}`);
     console.log(`[${code}] Error message: ${finalPrice.errorMsg}`);
     
+    // STEP 8: DETERMINE IF DISCOUNT APPLIED
     const discountApplied = (
       originalPrice !== finalPrice.total && 
       finalPrice.total !== 'N/A' &&
